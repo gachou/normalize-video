@@ -5,46 +5,54 @@
  * Released under the MIT license.
  */
 const path = require('path')
-const pify = require('pify')
-const execFile = pify(require('child_process').execFile)
+const fs = require('fs')
+const {fileInfo} = require('./probe')
+const targets = require('./targets')
+const cp = require('child_process')
 
 module.exports = normalizeVideo
 
 /**
- * Describe your module here
+ * Convert the input video to mp4-format with the least possible quality loss
+ * @param {string} inputFile
+ * @param {object} options
+ * @param {function(...*)} options.logger a function consuming log entries
  * @public
  */
 async function normalizeVideo (inputFile, options) {
   const opts = {
     dryRun: false,
+    logger: () => {}, // noop
     ...options
   }
 
-  const targetFile = inputFile.replace(/\.*?$/, '.mp4')
+  // Use only mp4 for now
+  const targetFile = inputFile.replace(/\..*?$/, '.mp4')
+  const targetFormat = targets.mp4
 
-  console.log(await codecs(inputFile))
-  if (opts.dryRun) {
-    console.log(inputFile, '->', targetFile)
-  }
+  const sourceFileInfo = await fileInfo(inputFile)
+
+  let computeSettings = (streamType) => targetFormat[streamType].computeSettings(sourceFileInfo.streams[streamType])
+  let args = [
+    ...computeSettings('video'),
+    ...computeSettings('audio'),
+    ...computeSettings('subtitle'),
+    '-f', opts.dryRun ? 'null' : targetFormat.format // -f null is like dry-run for ffmpeg
+  ]
+
+  await ffmpeg(inputFile, targetFile, args, options.logger)
 }
 
-async function codecs (file) {
-  const ffprobe = JSON.parse(await execFile(
-    'ffprobe',
-    ['-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams', file]
-  ))
-  console.log('ffprobe', ffprobe)
-  const result = {}
-  ffprobe.streams.forEach(function (stream) {
-    if (result[stream.codec_type]) {
-      throw new Error(`Multiple streams of the same type are not supported: Found "${stream.codec_type}" twice in "${file}"`)
-    }
-    result[stream.codec_type] = {
-      codec: stream.codec_name
-    }
+async function ffmpeg (input, output, args, logger) {
+  return new Promise((resolve, reject) => {
+    let cliArgs = ['-v', 'info', '-i', input, ...args, output]
+    logger('Running: ffmpeg ' + cliArgs.map((arg) => `'${arg}'`).join(' '))
+    cp.execFile('ffmpeg', cliArgs, (err, stdout, stderr) => {
+      if (err) {
+        console.error(stdout, stderr)
+        return reject(err)
+      }
+      resolve(stdout)
+    })
   })
-  return {
-    format: ffprobe.format.format_name,
-    streams: result
-  }
 }

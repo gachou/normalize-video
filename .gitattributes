@@ -1,6 +1,5 @@
 # Enforce Unix newlines
 * text eol=lf
-
 # binaries
 *.ai binary
 *.psd binary
@@ -8,3 +7,5 @@
 *.gif binary
 *.png binary
 *.jpeg binary
+*.mp4 filter=lfs diff=lfs merge=lfs -text
+*.mts filter=lfs diff=lfs merge=lfs -text
