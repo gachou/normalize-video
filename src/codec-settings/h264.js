@@ -15,14 +15,14 @@ function computeSettings (streamProbe) {
   const result = []
   // Preserve framerate setting (seems not to be done automatically when convertign from mts to mp4, even with "copy"
   if (streamProbe.avg_frame_rate) {
-    result.push('-r', streamProbe.avg_frame_rate)
+//    result.push('-r', streamProbe.avg_frame_rate)
   }
   if (streamProbe.codec_name === 'h264') {
     result.push('-c:v', 'copy')
   } else {
     result.push('-c:v', 'libx264')
     result.push('-crf', '17') // visually lossless
-    result.push('-preset',)
+    result.push('-preset', 'veryslow')
     result.push('-tune', 'film') // high quality movies
   }
   return result

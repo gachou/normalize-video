@@ -7,7 +7,7 @@
 
 /* eslint-env mocha */
 
-const probe = require('../src/probe')
+const probe = require('../src/metadata')
 const chai = require('chai')
 chai.use(require('dirty-chai'))
 const expect = chai.expect
