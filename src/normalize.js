@@ -16,8 +16,9 @@ module.exports = normalizeVideo
 /**
  * Convert the input video to mp4-format with the least possible quality loss
  * @param {string} inputFile
- * @param {string} targetFile
+ * @param {string|null} targetFile
  * @param {object} options
+ * @param {string} options.aspect the target aspect-ratio (e.g. 16:9)
  * @param {function(...*)} options.logger a function consuming log entries
  * @public
  */
@@ -26,6 +27,10 @@ async function normalizeVideo (inputFile, targetFile, options) {
     dryRun: false,
     logger: () => {}, // noop
     ...options
+  }
+
+  if (targetFile == null) {
+    targetFile = inputFile + '.converted.mp4'
   }
 
   // Use only mp4 for now
@@ -44,14 +49,17 @@ async function normalizeVideo (inputFile, targetFile, options) {
       return []
     }
   }
+
+  let aspectRatio = opts.aspect ? ['-aspect', opts.aspect ] : []
   let args = [
     ...computeSettings('video'),
+    ...aspectRatio,
     ...computeSettings('audio'),
     ...computeSettings('subtitle'),
     '-f', opts.dryRun ? 'null' : targetFormat.format // -f null is like dry-run for ffmpeg
   ]
 
-  await ffmpeg(inputFile, targetFile, args, options.logger)
+  await ffmpeg(inputFile, targetFile, args, opts.logger)
 
   const targetTags = {...sourceFileInfo.exiftool}
   const creationDateTags = ['XMP:CreateDate', 'QuickTime:CreateDate']
@@ -71,12 +79,7 @@ async function ffmpeg (input, output, args, logger) {
     let executable = 'ffmpeg'
     let cliArgs = ['-v', 'info', '-i', input, ...args, output]
     logger({label: 'run ffmpeg', executable, cliArgs})
-    cp.execFile(executable, cliArgs, (err, stdout, stderr) => {
-      if (err) {
-        console.error(stdout, stderr)
-        return reject(err)
-      }
-      resolve(stdout)
-    })
+    const child = cp.spawn(executable, cliArgs, {stdio: 'inherit'})
+    child.on('exit', (code) => code === 0 ? resolve() : reject(new Error('Unexpected exit code of ffmpeg: ' + code)))
   })
 }

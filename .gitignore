@@ -1,3 +1,4 @@
 node_modules
 *.iml
 /.idea
+/test/fixtures/2011-06-22__15-07-52-schmusen.avi
