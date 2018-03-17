@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+/* eslint-disable no-console */
 
 const normalize = require('../src/normalize')
 const debug = require('debug')('normalize-video:bin')
@@ -18,11 +18,16 @@ require('yargs')
       type: 'string'
     }
   },
-    (argv) => {
+    async (argv) => {
       console.log(argv)
-      Promise
-        .all(argv.files.map((file) => normalize(file, null, {dryRun: argv['dry-run'], aspect: argv['aspect'], logger: debug})))
-        .then(() => 'Done')
-        .then(console.log, console.error)
+      for (let i = 0; i < argv.files.length; i++) {
+        const file = argv.files[i]
+        try {
+          await normalize(file, {dryRun: argv['dry-run'], aspect: argv['aspect'], logger: debug})
+          console.log(`Done with ${file} (${i}/${argv.files.length}`)
+        } catch (e) {
+          console.log('Error while handling ', file, `${e.message}\n${e.stack}`)
+        }
+      }
     })
   .parse()
