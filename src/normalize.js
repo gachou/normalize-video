@@ -9,6 +9,7 @@ const targets = require('./targets')
 const cp = require('child_process')
 const pify = require('pify')
 const utimes = pify(require('fs').utimes)
+const rename = pify(require('fs').rename)
 const path = require('path')
 
 module.exports = normalizeVideo
@@ -16,62 +17,58 @@ module.exports = normalizeVideo
 /**
  * Convert the input video to mp4-format with the least possible quality loss
  * @param {string} inputFile
- * @param {string|null} targetFile
- * @param {object} options
- * @param {string} options.aspect the target aspect-ratio (e.g. 16:9)
- * @param {function(...*)} options.logger a function consuming log entries
+ * @param {object=} options
+ * @param {string=} options.targetFile
+ * @param {string=} options.aspect the target aspect-ratio (e.g. 16:9)
+ * @param {function(...*)=} options.logger a function consuming log entries
  * @public
  */
-async function normalizeVideo (inputFile, targetFile, options) {
+async function normalizeVideo (inputFile, options) {
   const opts = {
     dryRun: false,
+    targetFile: inputFile.replace(/\..*?$/, '.mp4'),
     logger: () => {}, // noop
     ...options
   }
 
-  if (targetFile == null) {
-    targetFile = inputFile + '.converted.mp4'
-  }
+  const tmpFile = opts.targetFile + '.tmp.mp4'
 
   // Use only mp4 for now
-  const targetFormat = targets.mp4
-  let extname = path.extname(targetFile)
-  if (extname !== targetFormat.extension) {
-    throw new Error(`Invalid extension of target file (expected: ${targetFormat.extension}, found: ${extname}`)
+  const targetSpec = targets.mp4
+  let extname = path.extname(opts.targetFile)
+  if (extname !== targetSpec.extension) {
+    throw new Error(`Invalid extension of target file (expected: ${targetSpec.extension}, found: ${extname}`)
   }
 
   const sourceFileInfo = await fileInfo(inputFile)
 
-  function computeSettings (streamType) {
-    if (sourceFileInfo.streams[streamType]) { // ... compute settings, if the stream exists in the source file
-      return targetFormat[streamType].computeSettings(sourceFileInfo.streams[streamType])
-    } else {
-      return []
-    }
-  }
-
-  let aspectRatio = opts.aspect ? ['-aspect', opts.aspect ] : []
+  let aspectRatio = opts.aspect ? ['-aspect', opts.aspect] : []
   let args = [
-    ...computeSettings('video'),
+    ...computeSettings(sourceFileInfo, targetSpec, 'video'),
     ...aspectRatio,
-    ...computeSettings('audio'),
-    ...computeSettings('subtitle'),
-    '-f', opts.dryRun ? 'null' : targetFormat.format // -f null is like dry-run for ffmpeg
+    ...computeSettings(sourceFileInfo, targetSpec, 'audio'),
+    ...computeSettings(sourceFileInfo, targetSpec, 'subtitle'),
+    '-f', opts.dryRun ? 'null' : targetSpec.format // -f null is like dry-run for ffmpeg
   ]
 
-  await ffmpeg(inputFile, targetFile, args, opts.logger)
+  await ffmpeg(inputFile, tmpFile, args, opts.logger)
 
   const targetTags = {...sourceFileInfo.exiftool}
   const creationDateTags = ['XMP:CreateDate', 'QuickTime:CreateDate']
-  // Find first relevant create date tag
+    // Find first relevant create date tag
   const relevantCreationDateTag = creationDateTags.find((tag) => targetTags[tag]) || 'File:FileModifyDate'
-  // Rewrite all creation date tags to this value
+    // Rewrite all creation date tags to this value
   creationDateTags.forEach((tag) => {
     targetTags[tag] = targetTags[relevantCreationDateTag]
   })
-  await writeTags(targetFile, targetTags)
+  await writeTags(tmpFile, targetTags)
 
-  await utimes(targetFile, new Date(), new Date(targetTags['File:FileModifyDate']))
+  await utimes(tmpFile, new Date(), new Date(targetTags['File:FileModifyDate']))
+  if (opts.targetFile) {
+    await rename(inputFile, inputFile.replace(/\.(.*?$)/, '.original.$1'))
+  }
+  await rename(tmpFile, opts.targetFile)
+  return opts.targetFile
 }
 
 async function ffmpeg (input, output, args, logger) {
@@ -82,4 +79,12 @@ async function ffmpeg (input, output, args, logger) {
     const child = cp.spawn(executable, cliArgs, {stdio: 'inherit'})
     child.on('exit', (code) => code === 0 ? resolve() : reject(new Error('Unexpected exit code of ffmpeg: ' + code)))
   })
+}
+
+function computeSettings (sourceFileInfo, targetSpec, streamType) {
+  if (sourceFileInfo.streams[streamType]) { // ... compute settings, if the stream exists in the source file
+    return targetSpec[streamType].computeSettings(sourceFileInfo.streams[streamType])
+  } else {
+    return []
+  }
 }

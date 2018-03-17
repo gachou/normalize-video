@@ -13,7 +13,7 @@ module.exports = function stripInfo (fileInfo) {
     file: fileInfo.file,
     format: fileInfo.format,
     streams: {
-      video: _.pick(fileInfo.streams.video, 'codec_name', 'codec_type', 'avg_frame_rate'),
+      video: _.pick(fileInfo.streams.video, 'codec_name', 'codec_type'),
       audio: _.pick(fileInfo.streams.audio, 'codec_name', 'codec_type'),
       subtitle: _.pick(fileInfo.streams.subtitle, 'codec_name', 'codec_type')
     }

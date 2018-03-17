@@ -13,10 +13,13 @@ chai.use(require('dirty-chai'))
 const expect = chai.expect
 const fs = require('fs')
 const stripInfo = require('./lib/stripInfo')
+const {prepareFixtures} = require('./lib/prepareFixtures')
 
 describe('the fileInfo function', function () {
+  before(() => prepareFixtures())
+
   it('should return a list of streams and tags contained in an mp4-file', async function () {
-    let file = 'test/fixtures/VID_20180313_214151.mp4'
+    let file = 'tmp/VID_20180313_214151.mp4'
     fs.utimesSync(file, new Date('2018-03-13T20:41:54+0100'), new Date('2018-03-13T20:41:54+0100'))
 
     expect(stripInfo(await probe.fileInfo(file))).to.deep.equal({
@@ -37,7 +40,6 @@ describe('the fileInfo function', function () {
         'subtitle': {},
         'video': {
           'codec_name': 'h264',
-          'avg_frame_rate': '4410000/148751',
           'codec_type': 'video'
         }
       }
@@ -45,13 +47,13 @@ describe('the fileInfo function', function () {
   })
 
   it('should return a list of codecs contained in an mts-file', async function () {
-    let file = 'test/fixtures/2015-02-15__12-03-58-00000.mts'
+    let file = 'tmp/2015-02-15__12-03-58-00000.mts'
     fs.utimesSync(file, new Date('2015-02-15T12:03:58+0100'), new Date('2015-02-15T12:03:58+0100'))
     expect(stripInfo(await probe.fileInfo(file))).to.deep.equal({
       'exiftool': {
         'File:FileModifyDate': '2015-02-15T12:03:58+0100'
       },
-      'file': 'test/fixtures/2015-02-15__12-03-58-00000.mts',
+      'file': 'tmp/2015-02-15__12-03-58-00000.mts',
       'format': 'mpegts',
       'streams': {
         'audio': {
@@ -64,11 +66,9 @@ describe('the fileInfo function', function () {
         },
         'video': {
           'codec_name': 'h264',
-          'codec_type': 'video',
-          'avg_frame_rate': '50/1'
+          'codec_type': 'video'
         }
       }
     })
   })
 })
-
