@@ -11,6 +11,8 @@ const pify = require('pify')
 const utimes = pify(require('fs').utimes)
 const rename = pify(require('fs').rename)
 const path = require('path')
+// Regex that matches that file extension
+const fileExtensionRegex = /\.([^.]+)$/
 
 module.exports = normalizeVideo
 
@@ -26,7 +28,7 @@ module.exports = normalizeVideo
 async function normalizeVideo (inputFile, options) {
   const opts = {
     dryRun: false,
-    targetFile: inputFile.replace(/\..*?$/, '.mp4'),
+    targetFile: inputFile.replace(fileExtensionRegex, '.mp4'),
     logger: () => {}, // noop
     ...options
   }
@@ -65,7 +67,7 @@ async function normalizeVideo (inputFile, options) {
 
   await utimes(tmpFile, new Date(), new Date(targetTags['File:FileModifyDate']))
   if (opts.targetFile) {
-    await rename(inputFile, inputFile.replace(/\.(.*?$)/, '.original.$1'))
+    await rename(inputFile, inputFile.replace(fileExtensionRegex, '.original.$1'))
   }
   await rename(tmpFile, opts.targetFile)
   return opts.targetFile

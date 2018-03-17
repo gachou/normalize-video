@@ -163,6 +163,15 @@ describe('normalize-video:', function () {
       expect(fs.existsSync(targetFile)).be.true()
       compareFiles('tmp/test-2018.original.mp4', 'test/fixtures/VID_20180313_214151.mp4')
     })
+
+    it('it should work with paths that start with "./"', async function () {
+      await copy('tmp/VID_20180313_214151.mp4', 'tmp/test-2018.mp4')
+      const targetFile = await normalizeVideo('./tmp/test-2018.mp4')
+      expect(targetFile).to.equal('./tmp/test-2018.mp4')
+      expect(fs.existsSync(targetFile)).be.true()
+      compareFiles('tmp/test-2018.original.mp4', 'test/fixtures/VID_20180313_214151.mp4')
+    })
+
   })
 })
 
